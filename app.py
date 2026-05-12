@@ -3,6 +3,37 @@ import pdfplumber
 import pandas as pd
 import re
 
+
+# 1. Detect the Header Row
+        header_idx = 0
+        for i, row in df.iterrows():
+            row_content = " ".join([str(x).upper() for x in row if x])
+            if "COURSE" in row_content or "COLLEGE" in row_content:
+                header_idx = i
+                break
+        
+        # Set columns and clean the dataframe
+        df.columns = [str(c).strip() if c else f"Empty_{i}" for i, c in enumerate(df.iloc[header_idx])]
+        df = df.iloc[header_idx + 1:].reset_index(drop=True)
+
+        # --- THE FIXES START HERE ---
+
+        # A. Clean empty strings to NaN so we can forward fill
+        df = df.replace(r'^\s*$', pd.NA, regex=True)
+
+        # B. Identify Columns (Improved matching)
+        college_col = next((c for c in df.columns if any(k in c.upper() for k in ["COLLEGE", "INSTITUTE", "NAME"])), None)
+        course_col = next((c for c in df.columns if any(k in c.upper() for k in ["COURSE", "BRANCH"])), None)
+
+        # C. Forward Fill the College Names 
+        # This fixes the issue where only the first course shows the college name
+        if college_col:
+            df[college_col] = df[college_col].ffill()
+        
+        # --- THE FIXES END HERE ---
+
+        # 2. Identify Categories (rest of your code...)
+        cat_cols = [str(c).strip() for c in df.columns if c and len(str(c)) <= 5 and str(c).upper() not in ["CODE", "SL NO"]]
 # Page Setup
 st.set_page_config(page_title="KCET Rank Organizer", layout="wide")
 
