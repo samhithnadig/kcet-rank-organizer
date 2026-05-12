@@ -3,81 +3,81 @@ import pdfplumber
 import pandas as pd
 import re
 
-# Page config
-st.set_page_config(page_title="KCET Rank Organizer", layout="wide")
+st.set_page_config(page_title="KCET Rank Finder", layout="wide")
 
-st.title("🎓 KCET Cutoff Rank Organizer")
-st.markdown("Upload the official KEA Cutoff PDF to sort colleges by rank.")
+# App Header
+st.title("KCET Rank Organizer")
+st.markdown("### Upload KEA Cutoff PDF to see College & Course rankings")
 
-# Helper function to clean rank strings
-def clean_rank_value(val):
+def clean_rank(val):
     if val is None or str(val).strip() == "" or "---" in str(val):
         return 999999
-    # Remove any non-numeric characters like commas
-    num_str = re.sub(r'[^0-9]', '', str(val))
-    return int(num_str) if num_str else 999999
+    num = re.sub(r'[^0-9]', '', str(val))
+    return int(num) if num else 999999
 
-# Cache the PDF processing so it doesn't re-run every time you change a filter
 @st.cache_data
 def process_pdf(file):
-    all_rows = []
+    all_data = []
     with pdfplumber.open(file) as pdf:
         for page in pdf.pages:
             table = page.extract_table()
             if table:
-                all_rows.extend(table)
-    return all_rows
+                all_data.extend(table)
+    return all_data
 
-uploaded_file = st.file_uploader("Upload KCET Cutoff PDF", type="pdf")
+uploaded_file = st.file_uploader("Upload PDF File", type="pdf")
 
 if uploaded_file:
-    raw_data = process_pdf(uploaded_file)
+    with st.spinner("Processing PDF..."):
+        data = process_pdf(uploaded_file)
     
-    if raw_data:
-        # Create DataFrame
-        df = pd.DataFrame(raw_data)
+    if data:
+        df = pd.DataFrame(data)
         
-        # KEA PDFs usually have headers in the first few rows. 
-        # We search for the row containing 'COURSE'
+        # Finding the Header Row
         header_idx = 0
         for i, row in df.iterrows():
-            if any("COURSE" in str(cell).upper() for cell in row if cell):
+            row_str = " ".join([str(x).upper() for x in row if x])
+            if "COURSE" in row_str or "COLLEGE" in row_str:
                 header_idx = i
                 break
         
-        # Set headers and clean data
         df.columns = df.iloc[header_idx]
         df = df.iloc[header_idx + 1:].reset_index(drop=True)
-        
-        # Drop rows that are likely empty or just page footers
-        df = df.dropna(subset=[df.columns[1]]) 
-        
-        # Identify Category Columns (short headers like GM, SCG, 2AG etc)
-        cat_cols = [str(c).strip() for c in df.columns if c and len(str(c)) <= 5]
-        
-        st.sidebar.header("Sorting Options")
-        selected_cat = st.sidebar.selectbox("Select Category (e.g. GM, 1G, SCG):", cat_cols)
 
-        if selected_cat:
-            # Create a numeric column for sorting
-            df['sort_key'] = df[selected_cat].apply(clean_rank_value)
+        # Identify Column Names automatically
+        college_col = next((c for c in df.columns if any(k in str(c).upper() for k in ["COLLEGE", "INSTITUTE"])), None)
+        course_col = next((c for c in df.columns if any(k in str(c).upper() for k in ["COURSE", "BRANCH"])), None)
+        
+        # Categories are usually the columns with short names (GM, SCG, etc.)
+        cat_cols = [str(c).strip() for c in df.columns if c and len(str(c)) <= 5 and str(c).upper() not in ["CODE", "SL NO"]]
+
+        st.sidebar.header("Filter Settings")
+        selected_cat = st.sidebar.selectbox("Select Category", ["Choose Category"] + cat_cols)
+
+        if selected_cat != "Choose Category":
+            # Select only needed columns
+            display_cols = []
+            if college_col: display_cols.append(college_col)
+            if course_col: display_cols.append(course_col)
+            display_cols.append(selected_cat)
+
+            # Create the filtered DataFrame
+            final_df = df[display_cols].copy()
             
-            # Sort Ascending
-            df_sorted = df.sort_values(by='sort_key', ascending=True)
+            # Clean and Sort by Rank
+            final_df['sort_val'] = final_df[selected_cat].apply(clean_rank)
+            final_df = final_df[final_df['sort_val'] < 999999] # Remove empty ranks
+            final_df = final_df.sort_values(by='sort_val', ascending=True)
             
-            # Remove the helper column before displaying
-            display_df = df_sorted.drop(columns=['sort_key'])
+            # Drop the hidden sort column
+            final_df = final_df.drop(columns=['sort_val'])
+
+            st.subheader(f"📊 Ranking for {selected_cat} (Ascending)")
+            st.dataframe(final_df, use_container_width=True, hide_index=True)
             
-            st.write(f"### Showing results for Category: **{selected_cat}** (Lowest Rank to Highest)")
-            st.dataframe(display_df, use_container_width=True)
-            
-            # Download button
-            csv = display_df.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label="📥 Download Sorted CSV",
-                data=csv,
-                file_name=f"kcet_sorted_{selected_cat}.csv",
-                mime="text/csv",
-            )
+            # Download link
+            csv = final_df.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Download This List", csv, f"KCET_{selected_cat}_Sorted.csv", "text/csv")
     else:
-        st.error("Could not extract tables from this PDF.")
+        st.error("Could not read any tables from this PDF.")
