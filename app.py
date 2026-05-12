@@ -5,10 +5,10 @@ import re
 
 
 # 1. Detect the Header Row
-        header_idx = 0
-        for i, row in df.iterrows():
-            row_content = " ".join([str(x).upper() for x in row if x])
-            if "COURSE" in row_content or "COLLEGE" in row_content:
+header_idx = 0
+for i, row in df.iterrows():
+        row_content = " ".join([str(x).upper() for x in row if x])
+        if "COURSE" in row_content or "COLLEGE" in row_content:
                 header_idx = i
                 break
         
