@@ -48,8 +48,11 @@ if uploaded_file:
 
         # 2. Identify Important Columns
         # We look for College Name and Course Name columns
-        college_col = next((c for c in df.columns if any(k in str(c).upper() for k in ["COLLEGE", "INSTITUTE", "NAME OF COLLEGE"])), None)
+        # 1. Detect column names dynamically
+        college_ = next((c for c in df.columns if any(k in str(c).upper() for k in ["COLLEGE", "INSTITUTE", "NAME OF COLLEGE"])), None)
         course_col = next((c for c in df.columns if any(k in str(c).upper() for k in ["COURSE", "BRANCH"])), None)
+
+        # 2. Extract row data from the detected college column
         
         # Categories are the short column names (GM, SCG, STG, etc.)
         cat_cols = [str(c).strip() for c in df.columns if c and len(str(c)) <= 5 and str(c).upper() not in ["CODE", "SL NO"]]
