@@ -65,7 +65,7 @@ if uploaded_file:
             # 4. Create the final clean view
             # Select ONLY College Name, Course Name, and the chosen rank
             cols_to_show = []
-            if college_col: cols_to_show.append(college_col)
+            if college_col: cols_to_show.append(college_)
             if course_col: cols_to_show.append(course_col)
             cols_to_show.append(selected_cat)
 
